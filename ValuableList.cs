@@ -1,0 +1,59 @@
+using BepInEx;
+using BepInEx.Configuration;
+using BepInEx.Logging;
+using HarmonyLib;
+using UnityEngine;
+
+namespace ValuableList;
+
+[BepInPlugin("McHorse.ValuableList", "ValuableList", "1.0")]
+[BepInDependency("nickklmao.menulib", BepInDependency.DependencyFlags.HardDependency)]
+public class ValuableList : BaseUnityPlugin
+{
+    internal static ValuableList Instance { get; private set; } = null!;
+    internal new static ManualLogSource Logger => Instance._logger;
+    private ManualLogSource _logger => base.Logger;
+    internal Harmony? Harmony { get; set; }
+    private ValuablesMenu? valuablesMenu;
+    private ConfigEntry<KeyCode>? openMenuKeybind;
+
+    private void Awake()
+    {
+        Instance = this;
+        
+        // Prevent the plugin from being deleted
+        this.gameObject.transform.parent = null;
+        this.gameObject.hideFlags = HideFlags.HideAndDontSave;
+
+        openMenuKeybind = Config.Bind(
+            "Controls", 
+            "Open Menu", 
+            KeyCode.K, 
+            "Keyboard key used to open the valuables menu."
+        );
+
+        Patch();
+        valuablesMenu = new ValuablesMenu(Logger);
+
+        Logger.LogInfo($"{Info.Metadata.GUID} v{Info.Metadata.Version} has loaded!");
+    }
+
+    internal void Patch()
+    {
+        Harmony ??= new Harmony(Info.Metadata.GUID);
+        Harmony.PatchAll();
+    }
+
+    internal void Unpatch()
+    {
+        Harmony?.UnpatchSelf();
+    }
+
+    private void Update()
+    {
+        if (SemiFunc.RunIsLevel() && SemiFunc.NoTextInputsActive() && openMenuKeybind != null && Input.GetKeyDown(openMenuKeybind.Value))
+        {
+            valuablesMenu?.Toggle();
+        }
+    }
+}
