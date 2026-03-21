@@ -16,6 +16,8 @@ public class ValuableList : BaseUnityPlugin
     internal Harmony? Harmony { get; set; }
     private ValuablesMenu? valuablesMenu;
     private ConfigEntry<KeyCode>? openMenuKeybind;
+    private ConfigEntry<bool>? roundPrices;
+    internal bool RoundPricesEnabled => roundPrices?.Value ?? true;
 
     private void Awake()
     {
@@ -30,6 +32,12 @@ public class ValuableList : BaseUnityPlugin
             "Open Menu", 
             KeyCode.K, 
             "Keyboard key used to open the valuables menu."
+        );
+        roundPrices = Config.Bind(
+            "General",
+            "RoundPrices",
+            true,
+            "Round list prices to thousands with one decimal place (e.g. 15.4k)."
         );
 
         Patch();

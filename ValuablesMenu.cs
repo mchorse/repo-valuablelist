@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using System.Globalization;
 using BepInEx.Logging;
 using MenuLib;
 using MenuLib.MonoBehaviors;
@@ -142,7 +143,7 @@ internal sealed class ValuablesMenu
                 
                 page.AddElementToScrollView(parent =>
                 {
-                    var lineLabel = MenuAPI.CreateREPOLabel($"{entry.Name} - ${entry.Price}", parent, default);
+                    var lineLabel = MenuAPI.CreateREPOLabel($"{entry.Name} - {FormatPrice(entry.Price)}", parent, default);
                     lineLabelRef = lineLabel;
                     
                     lineLabel.labelTMP.fontStyle = FontStyles.Normal;
@@ -322,6 +323,16 @@ internal sealed class ValuablesMenu
     private static bool IsAnotherMenuOpen()
     {
         return MenuManager.instance && MenuManager.instance.currentMenuPage;
+    }
+
+    private static string FormatPrice(int rawPrice)
+    {
+        if (ValuableList.Instance.RoundPricesEnabled)
+        {
+            return $"${(rawPrice / 1000f).ToString("0.0", CultureInfo.InvariantCulture)}K";
+        }
+
+        return $"${rawPrice}";
     }
 
     private static void SetLabelVisibility(REPOLabel? label, bool visible)

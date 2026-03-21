@@ -23,7 +23,7 @@ internal static class ValuableUtils
                 IsInCartOrExtraction(v)))
             .OrderBy(v => v.Room, StringComparer.OrdinalIgnoreCase)
             .ThenBy(v => v.IsInCartOrExtraction)
-            .ThenBy(v => v.Price)
+            .ThenByDescending(v => v.Price)
             .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .GroupBy(v => v.Room)
             .ToList();
