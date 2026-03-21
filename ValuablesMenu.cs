@@ -1,8 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
-using System.Globalization;
 using BepInEx.Logging;
 using MenuLib;
 using MenuLib.MonoBehaviors;
@@ -23,6 +22,9 @@ internal sealed class ValuablesMenu
     private bool isOpen;
     private readonly List<RoomGroupVisual> roomGroupVisuals = new();
     private REPOLabel? noResultsLabel;
+    private REPOButton? toggleCollectedButton;
+    private bool hideCollectedValuables;
+    private string currentSearchQuery = string.Empty;
 
     internal ValuablesMenu(ManualLogSource logger)
     {
@@ -59,9 +61,11 @@ internal sealed class ValuablesMenu
             maskPadding.top = 35f;
             page.maskPadding = maskPadding;
 
+            currentSearchQuery = string.Empty;
             var grouped = ValuableUtils.GetGroupedValuables();
             AddSearchBox(page);
             AddGroupedValuables(page, grouped);
+            AddCollectedButton(page);
             AddCollectedSummaryLabel(page, grouped);
 
             currentPage = page;
@@ -120,7 +124,7 @@ internal sealed class ValuablesMenu
         {
             var roomGroup = grouped[groupIndex];
             var roomTotal = roomGroup.Sum(entry => entry.Price);
-            var roomHeaderText = $"{roomGroup.Key} ({FormatPrice(roomTotal)})";
+            var roomHeaderText = $"{roomGroup.Key} ({ValuableUtils.FormatPrice(roomTotal)})";
             REPOLabel? groupHeader = null;
             
             page.AddElementToScrollView(parent =>
@@ -145,7 +149,7 @@ internal sealed class ValuablesMenu
                 
                 page.AddElementToScrollView(parent =>
                 {
-                    var lineLabel = MenuAPI.CreateREPOLabel($"{entry.Name} - {FormatPrice(entry.Price)}", parent, default);
+                    var lineLabel = MenuAPI.CreateREPOLabel($"{entry.Name} - {ValuableUtils.FormatPrice(entry.Price)}", parent, default);
                     lineLabelRef = lineLabel;
                     
                     lineLabel.labelTMP.fontStyle = FontStyles.Normal;
@@ -161,7 +165,7 @@ internal sealed class ValuablesMenu
 
                 if (lineLabelRef != null)
                 {
-                    entryVisuals.Add(new ValuableRowVisual(lineLabelRef, entry.Name));
+                    entryVisuals.Add(new ValuableRowVisual(lineLabelRef, entry.Name, entry.IsInCartOrExtraction, entry.Price));
                 }
             }
 
@@ -179,7 +183,7 @@ internal sealed class ValuablesMenu
 
             if (groupHeader != null)
             {
-                roomGroupVisuals.Add(new RoomGroupVisual(groupHeader, entryVisuals, spacer));
+                roomGroupVisuals.Add(new RoomGroupVisual(roomGroup.Key, groupHeader, entryVisuals, spacer));
             }
         }
     }
@@ -190,7 +194,8 @@ internal sealed class ValuablesMenu
         {
             MenuAPI.CreateREPOInputField("Search", query =>
             {
-                ApplySearchFilter(page, query);
+                currentSearchQuery = query ?? string.Empty;
+                ApplySearchFilter(page, currentSearchQuery);
             }, parent, new Vector2(83f, 272f)).transform.localScale = Vector3.one * 0.95f;
         });
     }
@@ -205,16 +210,24 @@ internal sealed class ValuablesMenu
             foreach (var group in roomGroupVisuals)
             {
                 var hasAnyVisibleEntry = false;
+                var visibleTotal = 0;
                 
                 foreach (var row in group.Rows)
                 {
-                    var visible = string.IsNullOrEmpty(normalized) || row.NameLower.Contains(normalized);
+                    var visibleByQuery = string.IsNullOrEmpty(normalized) || row.NameLower.Contains(normalized);
+                    var visibleByCollectedState = !hideCollectedValuables || !row.IsInCartOrExtraction;
+                    var visible = visibleByQuery && visibleByCollectedState;
                     
                     SetLabelVisibility(row.Label, visible);
                     hasAnyVisibleEntry |= visible;
+                    if (visible)
+                    {
+                        visibleTotal += row.Price;
+                    }
                 }
 
                 SetLabelVisibility(group.Header, hasAnyVisibleEntry);
+                group.Header.labelTMP.text = $"{group.RoomName} ({ValuableUtils.FormatPrice(visibleTotal)})";
                 
                 if (hasAnyVisibleEntry)
                 {
@@ -234,6 +247,7 @@ internal sealed class ValuablesMenu
             }
 
             SetLabelVisibility(noResultsLabel, roomGroupVisuals.Count > 0 && visibleGroupCount == 0);
+            UpdateToggleButtonVisual();
 
             page.scrollView.SetScrollPosition(0f);
         }
@@ -311,6 +325,21 @@ internal sealed class ValuablesMenu
         });
     }
 
+    private void AddCollectedButton(REPOPopupPage page)
+    {
+        page.AddElement(parent =>
+        {
+            toggleCollectedButton = MenuAPI.CreateREPOButton("Collected", () =>
+            {
+                hideCollectedValuables = !hideCollectedValuables;
+                
+                ApplySearchFilter(page, currentSearchQuery);
+            }, parent, new Vector2(66f, 18f));
+
+            UpdateToggleButtonVisual();
+        });
+    }
+
     private void CloseCurrentPage()
     {
         if (currentPage != null)
@@ -327,14 +356,14 @@ internal sealed class ValuablesMenu
         return MenuManager.instance && MenuManager.instance.currentMenuPage;
     }
 
-    private static string FormatPrice(int rawPrice)
+    private void UpdateToggleButtonVisual()
     {
-        if (ValuableList.Instance.RoundPricesEnabled)
+        if (toggleCollectedButton?.labelTMP == null)
         {
-            return $"${(rawPrice / 1000f).ToString("0.0", CultureInfo.InvariantCulture)}K";
+            return;
         }
 
-        return $"${rawPrice}";
+        toggleCollectedButton.labelTMP.text = hideCollectedValuables ? "Show Collected" : "Hide Collected";
     }
 
     private static void SetLabelVisibility(REPOLabel? label, bool visible)
@@ -369,25 +398,31 @@ internal sealed class ValuablesMenu
 
     private readonly struct ValuableRowVisual
     {
-        internal ValuableRowVisual(REPOLabel label, string name)
+        internal ValuableRowVisual(REPOLabel label, string name, bool isInCartOrExtraction, int price)
         {
             Label = label;
             NameLower = name.ToLowerInvariant();
+            IsInCartOrExtraction = isInCartOrExtraction;
+            Price = price;
         }
 
         internal REPOLabel Label { get; }
         internal string NameLower { get; }
+        internal bool IsInCartOrExtraction { get; }
+        internal int Price { get; }
     }
 
     private readonly struct RoomGroupVisual
     {
-        internal RoomGroupVisual(REPOLabel header, List<ValuableRowVisual> rows, REPOSpacer? spacer)
+        internal RoomGroupVisual(string roomName, REPOLabel header, List<ValuableRowVisual> rows, REPOSpacer? spacer)
         {
+            RoomName = roomName;
             Header = header;
             Rows = rows;
             Spacer = spacer;
         }
 
+        internal string RoomName { get; }
         internal REPOLabel Header { get; }
         internal List<ValuableRowVisual> Rows { get; }
         internal REPOSpacer? Spacer { get; }

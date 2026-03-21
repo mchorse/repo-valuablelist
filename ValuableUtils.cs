@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
@@ -130,6 +131,16 @@ internal static class ValuableUtils
         }
 
         return source;
+    }
+    
+    public static string FormatPrice(int rawPrice)
+    {
+        if (ValuableList.Instance.RoundPricesEnabled)
+        {
+            return $"${(rawPrice / 1000f).ToString("0.0", CultureInfo.InvariantCulture)}K";
+        }
+
+        return $"${rawPrice}";
     }
 }
 
