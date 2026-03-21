@@ -17,7 +17,9 @@ public class ValuableList : BaseUnityPlugin
     private ValuablesMenu? valuablesMenu;
     private ConfigEntry<KeyCode>? openMenuKeybind;
     private ConfigEntry<bool>? roundPrices;
+    private ConfigEntry<bool>? showMostExpensiveValuable;
     internal bool RoundPricesEnabled => roundPrices?.Value ?? true;
+    internal bool ShowMostExpensiveHudLabelEnabled => showMostExpensiveValuable?.Value ?? true;
 
     private void Awake()
     {
@@ -38,6 +40,12 @@ public class ValuableList : BaseUnityPlugin
             "RoundPrices",
             true,
             "Round list prices to thousands with one decimal place (e.g. 15.4k)."
+        );
+        showMostExpensiveValuable = Config.Bind(
+            "General",
+            "ShowMostExpensiveValuable",
+            false,
+            "Show a HUD label with the most expensive valuable in your current room."
         );
 
         Patch();

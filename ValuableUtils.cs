@@ -15,19 +15,37 @@ internal static class ValuableUtils
 
     internal static List<IGrouping<string, ValuableEntry>> GetGroupedValuables()
     {
-        return UnityEngine.Object.FindObjectsOfType<ValuableObject>()
-            .Where(v => v && v.gameObject.activeInHierarchy)
-            .Select(v => new ValuableEntry(
-                CleanValuableName(v.gameObject.name),
-                Mathf.RoundToInt(v.dollarValueCurrent),
-                GetRoomName(v),
-                IsInCartOrExtraction(v)))
+        return GetValuableEntries()
             .OrderBy(v => v.Room, StringComparer.OrdinalIgnoreCase)
             .ThenBy(v => v.IsInCartOrExtraction)
             .ThenByDescending(v => v.Price)
             .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .GroupBy(v => v.Room)
             .ToList();
+    }
+
+    internal static ValuableEntry? GetMostExpensiveInCurrentRoom()
+    {
+        var currentRoom = GetCurrentPlayerRoomName();
+        
+        if (string.IsNullOrWhiteSpace(currentRoom))
+        {
+            return null;
+        }
+
+        var entry = GetValuableEntries()
+            .Where(v => string.Equals(v.Room, currentRoom, StringComparison.OrdinalIgnoreCase))
+            .Where(v => !v.IsInCartOrExtraction)
+            .OrderByDescending(v => v.Price)
+            .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(entry.Name))
+        {
+            return null;
+        }
+
+        return entry;
     }
 
     internal static string? GetCurrentPlayerRoomName()
@@ -44,8 +62,7 @@ internal static class ValuableUtils
 
     private static string GetRoomName(ValuableObject valuable)
     {
-        var room = valuable.roomVolumeCheck?.CurrentRooms?
-            .FirstOrDefault(r => r != null && r.Module != null);
+        var room = valuable.roomVolumeCheck?.CurrentRooms?.FirstOrDefault(r => r != null && r.Module != null);
 
         if (room?.Module == null)
         {
@@ -57,12 +74,12 @@ internal static class ValuableUtils
 
     private static bool IsInCartOrExtraction(ValuableObject valuable)
     {
-        var inCart = valuable.physGrabObject != null &&
-            valuable.physGrabObject.impactDetector != null &&
-            valuable.physGrabObject.impactDetector.inCart;
+        var inCart = valuable.physGrabObject != null 
+            && valuable.physGrabObject.impactDetector != null 
+            && valuable.physGrabObject.impactDetector.inCart;
 
-        var inExtraction = valuable.roomVolumeCheck != null &&
-            valuable.roomVolumeCheck.inExtractionPoint;
+        var inExtraction = valuable.roomVolumeCheck != null 
+            && valuable.roomVolumeCheck.inExtractionPoint;
 
         return inCart || inExtraction;
     }
@@ -131,6 +148,15 @@ internal static class ValuableUtils
         }
 
         return source;
+    }
+
+    private static IEnumerable<ValuableEntry> GetValuableEntries()
+    {
+        return UnityEngine.Object.FindObjectsOfType<ValuableObject>()
+            .Where(v => v && v.gameObject.activeInHierarchy)
+            .Select(v => new ValuableEntry(
+                CleanValuableName(v.gameObject.name), Mathf.RoundToInt(v.dollarValueCurrent), GetRoomName(v), IsInCartOrExtraction(v)
+            ));
     }
     
     public static string FormatPrice(int rawPrice)
