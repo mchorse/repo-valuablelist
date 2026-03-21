@@ -119,11 +119,13 @@ internal sealed class ValuablesMenu
         for (var groupIndex = 0; groupIndex < grouped.Count; groupIndex++)
         {
             var roomGroup = grouped[groupIndex];
+            var roomTotal = roomGroup.Sum(entry => entry.Price);
+            var roomHeaderText = $"{roomGroup.Key} ({FormatPrice(roomTotal)})";
             REPOLabel? groupHeader = null;
             
             page.AddElementToScrollView(parent =>
             {
-                groupHeader = MenuAPI.CreateREPOLabel(roomGroup.Key, parent, default);
+                groupHeader = MenuAPI.CreateREPOLabel(roomHeaderText, parent, default);
                 
                 groupHeader.labelTMP.fontStyle = FontStyles.Bold;
                 groupHeader.labelTMP.fontSize = 24f;
