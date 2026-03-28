@@ -12,6 +12,9 @@ internal static class ValuableUtils
     private static readonly Regex RoomMetadataPrefixRegex = new(
         @"^[^-]+?\s*-\s*[A-Z]+\s*-\s*\d+\s*-\s*(.+)$",
         RegexOptions.Compiled);
+    private static float mostExpensiveCacheTime;
+    private static ValuableEntry? mostExpensiveCachedResult;
+    private const float MostExpensiveCacheInterval = 0.5f;
 
     internal static List<IGrouping<string, ValuableEntry>> GetGroupedValuables()
     {
@@ -26,26 +29,55 @@ internal static class ValuableUtils
 
     internal static ValuableEntry? GetMostExpensiveInCurrentRoom()
     {
+        if (Time.time - mostExpensiveCacheTime < MostExpensiveCacheInterval)
+        {
+            return mostExpensiveCachedResult;
+        }
+
+        mostExpensiveCacheTime = Time.time;
+        mostExpensiveCachedResult = ComputeMostExpensiveInCurrentRoom();
+
+        return mostExpensiveCachedResult;
+    }
+
+    private static ValuableEntry? ComputeMostExpensiveInCurrentRoom()
+    {
         var currentRoom = GetCurrentPlayerRoomName();
-        
         if (string.IsNullOrWhiteSpace(currentRoom))
         {
             return null;
         }
 
-        var entry = GetValuableEntries()
-            .Where(v => string.Equals(v.Room, currentRoom, StringComparison.OrdinalIgnoreCase))
-            .Where(v => !v.IsInCartOrExtraction)
-            .OrderByDescending(v => v.Price)
-            .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+        ValuableEntry? best = null;
 
-        if (string.IsNullOrWhiteSpace(entry.Name))
+        foreach (var v in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
         {
-            return null;
+            if (!v || !v.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (IsInCartOrExtraction(v))
+            {
+                continue;
+            }
+
+            var room = GetRoomName(v);
+
+            if (!string.Equals(room, currentRoom, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var price = Mathf.RoundToInt(v.dollarValueCurrent);
+            
+            if (best == null || price > best.Value.Price)
+            {
+                best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false);
+            }
         }
 
-        return entry;
+        return best;
     }
 
     internal static string? GetCurrentPlayerRoomName()
