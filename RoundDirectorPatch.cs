@@ -35,7 +35,7 @@ internal static class RoundDirectorPatch
             return;
         }
 
-        var entry = ValuableUtils.GetMostExpensiveInCurrentRoom();
+        var (entry, count) = ValuableUtils.GetMostExpensiveInCurrentRoom();
         
         if (entry == null)
         {
@@ -43,7 +43,7 @@ internal static class RoundDirectorPatch
             return;
         }
 
-        labelText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)}";
+        labelText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)} ({count})";
         
         SetLabelActive(true);
     }

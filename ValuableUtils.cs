@@ -13,7 +13,7 @@ internal static class ValuableUtils
         @"^[^-]+?\s*-\s*[A-Z]+\s*-\s*\d+\s*-\s*(.+)$",
         RegexOptions.Compiled);
     private static float mostExpensiveCacheTime;
-    private static ValuableEntry? mostExpensiveCachedResult;
+    private static (ValuableEntry? Entry, int Count) mostExpensiveCachedResult;
     private const float MostExpensiveCacheInterval = 0.5f;
 
     internal static List<IGrouping<string, ValuableEntry>> GetGroupedValuables()
@@ -27,7 +27,7 @@ internal static class ValuableUtils
             .ToList();
     }
 
-    internal static ValuableEntry? GetMostExpensiveInCurrentRoom()
+    internal static (ValuableEntry? Entry, int Count) GetMostExpensiveInCurrentRoom()
     {
         if (Time.time - mostExpensiveCacheTime < MostExpensiveCacheInterval)
         {
@@ -40,23 +40,19 @@ internal static class ValuableUtils
         return mostExpensiveCachedResult;
     }
 
-    private static ValuableEntry? ComputeMostExpensiveInCurrentRoom()
+    private static (ValuableEntry? Entry, int Count) ComputeMostExpensiveInCurrentRoom()
     {
         var currentRoom = GetCurrentPlayerRoomName();
         if (string.IsNullOrWhiteSpace(currentRoom))
         {
-            return null;
+            return (null, 0);
         }
 
         ValuableEntry? best = null;
+        var count = 0;
 
-        foreach (var v in UnityEngine.Object.FindObjectsOfType<ValuableObject>())
+        foreach (var v in GetAllValuableObjects())
         {
-            if (!v || !v.gameObject.activeInHierarchy)
-            {
-                continue;
-            }
-
             if (IsInCartOrExtraction(v))
             {
                 continue;
@@ -69,6 +65,7 @@ internal static class ValuableUtils
                 continue;
             }
 
+            count++;
             var price = Mathf.RoundToInt(v.dollarValueCurrent);
             
             if (best == null || price > best.Value.Price)
@@ -77,7 +74,7 @@ internal static class ValuableUtils
             }
         }
 
-        return best;
+        return (best, count);
     }
 
     internal static string? GetCurrentPlayerRoomName()
@@ -182,10 +179,17 @@ internal static class ValuableUtils
         return source;
     }
 
+    private static IEnumerable<ValuableObject> GetAllValuableObjects()
+    {
+        var tracked = ValuableObjectPatch.Tracked;
+        tracked.RemoveAll(v => !v);
+
+        return tracked.Where(v => v.gameObject.activeInHierarchy);
+    }
+
     private static IEnumerable<ValuableEntry> GetValuableEntries()
     {
-        return UnityEngine.Object.FindObjectsOfType<ValuableObject>()
-            .Where(v => v && v.gameObject.activeInHierarchy)
+        return GetAllValuableObjects()
             .Select(v => new ValuableEntry(
                 CleanValuableName(v.gameObject.name), Mathf.RoundToInt(v.dollarValueCurrent), GetRoomName(v), IsInCartOrExtraction(v)
             ));
