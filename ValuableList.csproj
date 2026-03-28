@@ -5,6 +5,18 @@
     <Compile Remove="open-source\**\*" />
   </ItemGroup>
 
+  <!-- Repo / publish / local reference files: do not copy to bin or plugins output -->
+  <ItemGroup>
+    <None Update=".gitignore;README.md;libs/**/*">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPluginOutputDirectory>Never</CopyToPluginOutputDirectory>
+    </None>
+    <None Update="publish/**/*">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPluginOutputDirectory>Never</CopyToPluginOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>12</LangVersion>
