@@ -23,6 +23,7 @@ internal sealed class ValuablesMenu
     private readonly List<RoomGroupVisual> roomGroupVisuals = new();
     private REPOLabel? noResultsLabel;
     private REPOButton? toggleCollectedButton;
+    private REPOLabel? summaryLabel;
     private bool hideCollectedValuables;
     private string currentSearchQuery = string.Empty;
 
@@ -66,7 +67,7 @@ internal sealed class ValuablesMenu
             AddSearchBox(page);
             AddGroupedValuables(page, grouped);
             AddCollectedButton(page);
-            AddCollectedSummaryLabel(page, grouped);
+            summaryLabel = AddCollectedSummaryLabel(page, grouped);
 
             currentPage = page;
             isOpen = true;
@@ -78,6 +79,7 @@ internal sealed class ValuablesMenu
             logger.LogError($"Failed to open valuables menu: {ex}");
             isOpen = false;
             currentPage = null;
+            summaryLabel = null;
         }
     }
 
@@ -248,6 +250,7 @@ internal sealed class ValuablesMenu
 
             SetLabelVisibility(noResultsLabel, roomGroupVisuals.Count > 0 && visibleGroupCount == 0);
             UpdateToggleButtonVisual();
+            UpdateSummaryLabelFromVisibleRows();
 
             page.scrollView.SetScrollPosition(0f);
         }
@@ -307,22 +310,69 @@ internal sealed class ValuablesMenu
         ScrollToCurrentPlayerRoom(page, grouped);
     }
 
-    private void AddCollectedSummaryLabel(REPOPopupPage page, List<IGrouping<string, ValuableEntry>> grouped)
+    private REPOLabel? AddCollectedSummaryLabel(REPOPopupPage page, List<IGrouping<string, ValuableEntry>> grouped)
     {
-        var allCount = grouped.Sum(group => group.Count());
-        var collectedCount = grouped.Sum(group => group.Count(entry => entry.IsInCartOrExtraction));
-        var isAllCollected = allCount > 0 && collectedCount == allCount;
-        var summaryColor = isAllCollected ? HighlightValueLabelColor : ValueLabelColor;
+        REPOLabel? created = null;
 
         page.AddElement(parent =>
         {
-            var summaryLabel = MenuAPI.CreateREPOLabel($"{collectedCount}/{allCount}", parent, new Vector2(120f, 20f));
+            created = MenuAPI.CreateREPOLabel(BuildSummaryText(grouped), parent, new Vector2(120f, 20f));
 
-            summaryLabel.labelTMP.fontStyle = FontStyles.Normal;
-            summaryLabel.labelTMP.fontSize = 24f;
-            summaryLabel.labelTMP.color = summaryColor;
-            summaryLabel.labelTMP.alignment = TextAlignmentOptions.Right;
+            created.labelTMP.fontStyle = FontStyles.Normal;
+            created.labelTMP.fontSize = 24f;
+            created.labelTMP.color = SummaryColorForGrouped(grouped);
+            created.labelTMP.alignment = TextAlignmentOptions.Right;
         });
+
+        return created;
+    }
+
+    private static string BuildSummaryText(IEnumerable<IGrouping<string, ValuableEntry>> grouped)
+    {
+        var allCount = grouped.Sum(group => group.Count());
+        var collectedCount = grouped.Sum(group => group.Count(entry => entry.IsInCartOrExtraction));
+        var totalAcquirable = grouped.Sum(group => group.Where(entry => !entry.IsInCartOrExtraction).Sum(entry => entry.Price));
+
+        return $"{collectedCount}/{allCount}, {ValuableUtils.FormatPrice(totalAcquirable)}";
+    }
+
+    private static Color SummaryColorForGrouped(IEnumerable<IGrouping<string, ValuableEntry>> grouped)
+    {
+        var allCount = grouped.Sum(group => group.Count());
+        var collectedCount = grouped.Sum(group => group.Count(entry => entry.IsInCartOrExtraction));
+
+        var isAllCollected = allCount > 0 && collectedCount == allCount;
+
+        return isAllCollected ? HighlightValueLabelColor : ValueLabelColor;
+    }
+
+    private void UpdateSummaryLabelFromVisibleRows()
+    {
+        if (summaryLabel?.labelTMP == null)
+        {
+            return;
+        }
+
+        var collected = 0;
+        var total = 0;
+        var acquirableSum = 0;
+
+        foreach (var group in roomGroupVisuals)
+        {
+            foreach (var row in group.Rows)
+            {
+                acquirableSum += row.Price;
+                total++;
+
+                if (row.IsInCartOrExtraction)
+                {
+                    collected++;
+                }
+            }
+        }
+
+        summaryLabel.labelTMP.text = $"{collected}/{total} - {ValuableUtils.FormatPrice(acquirableSum)}";
+        summaryLabel.labelTMP.color = total > 0 && collected == total ? HighlightValueLabelColor : ValueLabelColor;
     }
 
     private void AddCollectedButton(REPOPopupPage page)
@@ -349,6 +399,7 @@ internal sealed class ValuablesMenu
 
         currentPage = null;
         isOpen = false;
+        summaryLabel = null;
     }
 
     private static bool IsAnotherMenuOpen()
