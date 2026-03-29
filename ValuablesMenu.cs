@@ -14,7 +14,7 @@ internal sealed class ValuablesMenu
 {
     private static readonly Color ModuleHeaderColor = new Color(68f / 255f, 136f / 255f, 1f, 1f);
     private static readonly Color ValueLabelColor = Color.white;
-    private static readonly Color HighlightValueLabelColor = new Color(0f, 1f, 68f / 255f, 1f);
+    internal static readonly Color HighlightValueLabelColor = new Color(0f, 1f, 68f / 255f, 1f);
     private static readonly Color ActiveRoomHeaderColor = Color.Lerp(ModuleHeaderColor, HighlightValueLabelColor, 0.75f);
 
     private readonly ManualLogSource logger;

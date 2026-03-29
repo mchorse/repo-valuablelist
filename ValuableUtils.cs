@@ -9,12 +9,11 @@ namespace ValuableList;
 
 internal static class ValuableUtils
 {
-    private static readonly Regex RoomMetadataPrefixRegex = new(
-        @"^[^-]+?\s*-\s*[A-Z]+\s*-\s*\d+\s*-\s*(.+)$",
-        RegexOptions.Compiled);
-    private static float mostExpensiveCacheTime;
+    private static readonly Regex RoomMetadataPrefixRegex = new(@"^[^-]+?\s*-\s*[A-Z]+\s*-\s*\d+\s*-\s*(.+)$", RegexOptions.Compiled);
+    private static float hudCacheTime;
     private static (ValuableEntry? Entry, int Count) mostExpensiveCachedResult;
-    private const float MostExpensiveCacheInterval = 0.5f;
+    private static (int CollectedCount, int TotalCount, int CollectedValue, int TotalValue) levelCollectionCachedResult;
+    private const float HudCacheInterval = 0.5f;
 
     internal static List<IGrouping<string, ValuableEntry>> GetGroupedValuables()
     {
@@ -29,52 +28,74 @@ internal static class ValuableUtils
 
     internal static (ValuableEntry? Entry, int Count) GetMostExpensiveInCurrentRoom()
     {
-        if (Time.time - mostExpensiveCacheTime < MostExpensiveCacheInterval)
-        {
-            return mostExpensiveCachedResult;
-        }
-
-        mostExpensiveCacheTime = Time.time;
-        mostExpensiveCachedResult = ComputeMostExpensiveInCurrentRoom();
-
+        EnsureHudCaches();
+        
         return mostExpensiveCachedResult;
     }
 
-    private static (ValuableEntry? Entry, int Count) ComputeMostExpensiveInCurrentRoom()
+    internal static (int CollectedCount, int TotalCount, int CollectedValue, int TotalValue) GetLevelCollectionStats()
     {
-        var currentRoom = GetCurrentPlayerRoomName();
-        if (string.IsNullOrWhiteSpace(currentRoom))
+        EnsureHudCaches();
+
+        return levelCollectionCachedResult;
+    }
+
+    private static void EnsureHudCaches()
+    {
+        if (Time.time - hudCacheTime < HudCacheInterval)
         {
-            return (null, 0);
+            return;
         }
 
+        hudCacheTime = Time.time;
+
+        ComputeHudCaches();
+    }
+
+    private static void ComputeHudCaches()
+    {
+        var currentRoom = GetCurrentPlayerRoomName();
         ValuableEntry? best = null;
-        var count = 0;
+        var roomCount = 0;
+        var totalCount = 0;
+        var collectedCount = 0;
+        var totalValue = 0;
+        var collectedValue = 0;
 
         foreach (var v in GetAllValuableObjects())
         {
-            if (IsInCartOrExtraction(v))
-            {
-                continue;
-            }
-
-            var room = GetRoomName(v);
-
-            if (!string.Equals(room, currentRoom, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            count++;
+            totalCount++;
+            
             var price = Mathf.RoundToInt(v.dollarValueCurrent);
             
-            if (best == null || price > best.Value.Price)
+            totalValue += price;
+
+            var inCartOrExtraction = IsInCartOrExtraction(v);
+
+            if (inCartOrExtraction)
             {
-                best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false);
+                collectedCount++;
+                collectedValue += price;
+            }
+
+            if (!string.IsNullOrWhiteSpace(currentRoom) && !inCartOrExtraction)
+            {
+                var room = GetRoomName(v);
+
+                if (string.Equals(room, currentRoom, StringComparison.OrdinalIgnoreCase))
+                {
+                    roomCount++;
+
+                    if (best == null || price > best.Value.Price)
+                    {
+                        best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false);
+                    }
+                }
             }
         }
 
-        return (best, count);
+        mostExpensiveCachedResult = (best, roomCount);
+        levelCollectionCachedResult = (collectedCount, totalCount, collectedValue, totalValue);
     }
 
     internal static string? GetCurrentPlayerRoomName()
@@ -182,6 +203,7 @@ internal static class ValuableUtils
     private static IEnumerable<ValuableObject> GetAllValuableObjects()
     {
         var tracked = ValuableObjectPatch.Tracked;
+
         tracked.RemoveAll(v => !v);
 
         return tracked.Where(v => v.gameObject.activeInHierarchy);
