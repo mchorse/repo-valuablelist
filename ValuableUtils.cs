@@ -66,7 +66,7 @@ internal static class ValuableUtils
         {
             totalCount++;
             
-            var price = Mathf.RoundToInt(v.dollarValueCurrent);
+            var price = FloorDollarValue(v.dollarValueCurrent);
             
             totalValue += price;
 
@@ -213,7 +213,7 @@ internal static class ValuableUtils
     {
         return GetAllValuableObjects()
             .Select(v => new ValuableEntry(
-                CleanValuableName(v.gameObject.name), Mathf.RoundToInt(v.dollarValueCurrent), GetRoomName(v), IsInCartOrExtraction(v)
+                CleanValuableName(v.gameObject.name), FloorDollarValue(v.dollarValueCurrent), GetRoomName(v), IsInCartOrExtraction(v)
             ));
     }
     
@@ -221,10 +221,17 @@ internal static class ValuableUtils
     {
         if (ValuableList.Instance.RoundPricesEnabled)
         {
-            return $"${(rawPrice / 1000f).ToString("0.0", CultureInfo.InvariantCulture)}K";
+            var kOneDecimalFloored = Mathf.Floor(rawPrice / 100f) / 10f;
+
+            return $"${kOneDecimalFloored.ToString("0.0", CultureInfo.InvariantCulture)}K";
         }
 
         return $"${rawPrice}";
+    }
+
+    private static int FloorDollarValue(float dollarValueCurrent)
+    {
+        return Mathf.FloorToInt(dollarValueCurrent);
     }
 }
 
