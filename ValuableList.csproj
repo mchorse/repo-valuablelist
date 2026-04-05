@@ -11,7 +11,7 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPluginOutputDirectory>Never</CopyToPluginOutputDirectory>
     </None>
-    <None Update="publish/**/*">
+    <None Update="publish/**/*;publish.zip;icon.png;manifest.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPluginOutputDirectory>Never</CopyToPluginOutputDirectory>
     </None>

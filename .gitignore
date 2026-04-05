@@ -50,5 +50,6 @@ package.json
 
 # Publish
 /publish
+/publish.zip
 open-source/
 libs/
