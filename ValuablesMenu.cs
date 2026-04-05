@@ -126,7 +126,7 @@ internal sealed class ValuablesMenu
         {
             var roomGroup = grouped[groupIndex];
             var roomTotal = roomGroup.Sum(entry => entry.Price);
-            var roomHeaderText = $"{roomGroup.Key} ({ValuableUtils.FormatPrice(roomTotal)})";
+            var roomHeaderText = $"{ValuableUtils.TruncateRoomNameForMenuDisplay(roomGroup.Key)} ({ValuableUtils.FormatPrice(roomTotal)})";
             REPOLabel? groupHeader = null;
             
             page.AddElementToScrollView(parent =>
@@ -151,7 +151,7 @@ internal sealed class ValuablesMenu
                 
                 page.AddElementToScrollView(parent =>
                 {
-                    var lineLabel = MenuAPI.CreateREPOLabel($"{entry.Name} - {ValuableUtils.FormatPrice(entry.Price)}", parent, default);
+                    var lineLabel = MenuAPI.CreateREPOLabel(FormatValuableLine(entry), parent, default);
                     lineLabelRef = lineLabel;
                     
                     lineLabel.labelTMP.fontStyle = FontStyles.Normal;
@@ -188,6 +188,20 @@ internal sealed class ValuablesMenu
                 roomGroupVisuals.Add(new RoomGroupVisual(roomGroup.Key, groupHeader, entryVisuals, spacer));
             }
         }
+    }
+
+    private static string FormatValuableLine(ValuableEntry entry)
+    {
+        var priceText = ValuableUtils.FormatPrice(entry.Price);
+
+        if (!ValuableList.Instance.ShowDistanceInMenuEnabled)
+        {
+            return $"{entry.Name} - {priceText}";
+        }
+
+        var dist = ValuableUtils.FormatDistanceMetersOneDecimal(entry.DistanceFromPlayerMeters);
+
+        return $"{entry.Name} - {priceText} ({dist}m)";
     }
 
     private void AddSearchBox(REPOPopupPage page)
@@ -229,7 +243,7 @@ internal sealed class ValuablesMenu
                 }
 
                 SetLabelVisibility(group.Header, hasAnyVisibleEntry);
-                group.Header.labelTMP.text = $"{group.RoomName} ({ValuableUtils.FormatPrice(visibleTotal)})";
+                group.Header.labelTMP.text = $"{ValuableUtils.TruncateRoomNameForMenuDisplay(group.RoomName)} ({ValuableUtils.FormatPrice(visibleTotal)})";
                 
                 if (hasAnyVisibleEntry)
                 {

@@ -88,7 +88,7 @@ internal static class ValuableUtils
 
                     if (best == null || price > best.Value.Price)
                     {
-                        best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false);
+                        best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false, 0f);
                     }
                 }
             }
@@ -211,10 +211,28 @@ internal static class ValuableUtils
 
     private static IEnumerable<ValuableEntry> GetValuableEntries()
     {
+        var includeDistance = ValuableList.Instance.ShowDistanceInMenuEnabled;
+
         return GetAllValuableObjects()
             .Select(v => new ValuableEntry(
-                CleanValuableName(v.gameObject.name), FloorDollarValue(v.dollarValueCurrent), GetRoomName(v), IsInCartOrExtraction(v)
+                CleanValuableName(v.gameObject.name),
+                FloorDollarValue(v.dollarValueCurrent),
+                GetRoomName(v),
+                IsInCartOrExtraction(v),
+                includeDistance ? GetDistanceFromPlayerMeters(v) : 0f
             ));
+    }
+
+    private static float GetDistanceFromPlayerMeters(ValuableObject valuable)
+    {
+        var player = PlayerAvatar.instance;
+
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        return Vector3.Distance(player.transform.position, valuable.transform.position);
     }
     
     public static string FormatPrice(int rawPrice)
@@ -229,6 +247,23 @@ internal static class ValuableUtils
         return $"${rawPrice}";
     }
 
+    internal static string FormatDistanceMetersOneDecimal(float meters)
+    {
+        var flooredTenth = Mathf.Floor(Mathf.Max(0f, meters) * 10f) / 10f;
+
+        return flooredTenth.ToString("0.0", CultureInfo.InvariantCulture);
+    }
+
+    internal static string TruncateRoomNameForMenuDisplay(string roomName)
+    {
+        if (string.IsNullOrEmpty(roomName) || roomName.Length <= 28)
+        {
+            return roomName;
+        }
+
+        return roomName.Substring(0, 25) + "...";
+    }
+
     private static int FloorDollarValue(float dollarValueCurrent)
     {
         return Mathf.FloorToInt(dollarValueCurrent);
@@ -241,12 +276,14 @@ internal readonly struct ValuableEntry
     public int Price { get; }
     public string Room { get; }
     public bool IsInCartOrExtraction { get; }
+    public float DistanceFromPlayerMeters { get; }
 
-    internal ValuableEntry(string name, int price, string room, bool isInCartOrExtraction)
+    internal ValuableEntry(string name, int price, string room, bool isInCartOrExtraction, float distanceFromPlayerMeters = 0f)
     {
         Name = name;
         Price = price;
         Room = room;
         IsInCartOrExtraction = isInCartOrExtraction;
+        DistanceFromPlayerMeters = distanceFromPlayerMeters;
     }
 }

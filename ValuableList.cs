@@ -18,8 +18,10 @@ public class ValuableList : BaseUnityPlugin
     private ConfigEntry<KeyCode>? openMenuKeybind;
     private ConfigEntry<bool>? roundPrices;
     private ConfigEntry<bool>? showMostExpensiveValuable;
+    private ConfigEntry<bool>? showDistanceInMenu;
     internal bool RoundPricesEnabled => roundPrices?.Value ?? true;
     internal bool ShowMostExpensiveHudLabelEnabled => showMostExpensiveValuable?.Value ?? true;
+    internal bool ShowDistanceInMenuEnabled => showDistanceInMenu?.Value ?? false;
 
     private void Awake()
     {
@@ -46,6 +48,12 @@ public class ValuableList : BaseUnityPlugin
             "ShowMostExpensiveValuable",
             false,
             "Show a HUD label with the most expensive valuable in your current room."
+        );
+        showDistanceInMenu = Config.Bind(
+            "General",
+            "ShowDistanceInMenu",
+            false,
+            "When enabled, the valuables menu appends distance from your player in meters to each line (HUD unchanged)."
         );
 
         Patch();
