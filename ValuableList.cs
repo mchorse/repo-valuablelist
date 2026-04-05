@@ -34,7 +34,7 @@ public class ValuableList : BaseUnityPlugin
         openMenuKeybind = Config.Bind(
             "Controls", 
             "Open Menu", 
-            KeyCode.K, 
+            KeyCode.N, 
             "Keyboard key used to open the valuables menu."
         );
         roundPrices = Config.Bind(
