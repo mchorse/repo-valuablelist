@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -17,13 +18,62 @@ internal static class ValuableUtils
 
     internal static List<IGrouping<string, ValuableEntry>> GetGroupedValuables()
     {
-        return GetValuableEntries()
+        var orderedEntries = GetValuableEntries()
             .OrderBy(v => v.Room, StringComparer.OrdinalIgnoreCase)
             .ThenBy(v => v.IsInCartOrExtraction)
             .ThenByDescending(v => v.Price)
             .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
-            .GroupBy(v => v.Room)
             .ToList();
+
+        var roomGroups = orderedEntries
+            .GroupBy(v => v.Room)
+            .Select(g => new MaterializedRoomGroup(g.Key, g.ToList()))
+            .ToList();
+
+        roomGroups.Sort((a, b) =>
+        {
+            var totalA = SumPrices(a);
+            var totalB = SumPrices(b);
+            var cmp = totalB.CompareTo(totalA);
+
+            if (cmp != 0)
+            {
+                return cmp;
+            }
+
+            return string.Compare(a.Key, b.Key, StringComparison.OrdinalIgnoreCase);
+        });
+
+        return roomGroups.ConvertAll(g => (IGrouping<string, ValuableEntry>)g);
+    }
+
+    private static long SumPrices(IEnumerable<ValuableEntry> entries)
+    {
+        long sum = 0;
+
+        foreach (var e in entries)
+        {
+            sum += e.Price;
+        }
+
+        return sum;
+    }
+
+    private sealed class MaterializedRoomGroup : IGrouping<string, ValuableEntry>
+    {
+        private readonly List<ValuableEntry> _entries;
+
+        internal MaterializedRoomGroup(string key, List<ValuableEntry> entries)
+        {
+            Key = key;
+            _entries = entries;
+        }
+
+        public string Key { get; }
+
+        public IEnumerator<ValuableEntry> GetEnumerator() => _entries.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     internal static (ValuableEntry? Entry, int Count) GetMostExpensiveInCurrentRoom()
