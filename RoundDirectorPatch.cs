@@ -11,9 +11,11 @@ internal static class RoundDirectorPatch
     private const float HudPrimaryFontSize = 16f;
     private const float HudLineStackSpacing = -6f;
     private static readonly float HudStatsFontSize = HudPrimaryFontSize * 1.5f;
+    private static readonly Color HudCurrentRoomColor = new Color(1f, 0.5f, 0.08f, 1f);
 
     private static GameObject? labelObject;
-    private static TextMeshProUGUI? roomLineText;
+    private static TextMeshProUGUI? currentRoomLineText;
+    private static TextMeshProUGUI? mostExpensiveLineText;
     private static TextMeshProUGUI? statsLineText;
 
     [HarmonyPostfix]
@@ -29,7 +31,7 @@ internal static class RoundDirectorPatch
 
         EnsureLabel();
         
-        if (statsLineText == null)
+        if (currentRoomLineText == null || statsLineText == null)
         {
             return;
         }
@@ -40,6 +42,10 @@ internal static class RoundDirectorPatch
             return;
         }
 
+        var formattedRoom = ValuableUtils.GetCurrentPlayerRoomName();
+        currentRoomLineText.text = string.IsNullOrWhiteSpace(formattedRoom) ? "Unknown" : formattedRoom;
+        currentRoomLineText.color = HudCurrentRoomColor;
+
         var (entry, count) = ValuableUtils.GetMostExpensiveInCurrentRoom();
         var (collected, total, collectedValue, totalValue) = ValuableUtils.GetLevelCollectionStats();
         var statsPlain = $"{collected}/{total} - {ValuableUtils.FormatPrice(collectedValue)}/{ValuableUtils.FormatPrice(totalValue)}";
@@ -47,16 +53,16 @@ internal static class RoundDirectorPatch
         statsLineText.text = statsPlain;
         statsLineText.color = total > 0 && collected == total ? ValuablesMenu.HighlightValueLabelColor : Color.white;
 
-        if (roomLineText != null)
+        if (mostExpensiveLineText != null)
         {
             if (entry != null)
             {
-                roomLineText.gameObject.SetActive(true);
-                roomLineText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)} ({count})";
+                mostExpensiveLineText.gameObject.SetActive(true);
+                mostExpensiveLineText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)} ({count})";
             }
             else
             {
-                roomLineText.gameObject.SetActive(false);
+                mostExpensiveLineText.gameObject.SetActive(false);
             }
         }
 
@@ -65,12 +71,13 @@ internal static class RoundDirectorPatch
 
     private static void EnsureLabel()
     {
-        if (labelObject != null && (roomLineText == null || statsLineText == null))
+        if (labelObject != null && (currentRoomLineText == null || mostExpensiveLineText == null || statsLineText == null))
         {
             Object.Destroy(labelObject);
 
             labelObject = null;
-            roomLineText = null;
+            currentRoomLineText = null;
+            mostExpensiveLineText = null;
             statsLineText = null;
         }
 
@@ -86,7 +93,7 @@ internal static class RoundDirectorPatch
             return;
         }
 
-        labelObject = new GameObject("ValuableList Most Expensive Valuable");
+        labelObject = new GameObject("VL-ValuableList Most Expensive Valuable");
         labelObject.transform.SetParent(gameHud.transform, false);
 
         var vlg = labelObject.AddComponent<VerticalLayoutGroup>();
@@ -113,13 +120,18 @@ internal static class RoundDirectorPatch
             hudFont = taxText.font;
         }
 
-        var roomGo = new GameObject("Room line");
-        
-        roomGo.transform.SetParent(labelObject.transform, false);
-        roomLineText = roomGo.AddComponent<TextMeshProUGUI>();
-        ConfigureHudLine(roomLineText, HudPrimaryFontSize, hudFont);
+        var currentRoomGo = new GameObject("VL-Current room line");
+        currentRoomGo.transform.SetParent(labelObject.transform, false);
+        currentRoomLineText = currentRoomGo.AddComponent<TextMeshProUGUI>();
+        ConfigureHudLine(currentRoomLineText, HudPrimaryFontSize, hudFont);
+        currentRoomLineText.color = HudCurrentRoomColor;
 
-        var statsGo = new GameObject("Stats line");
+        var expensiveGo = new GameObject("VL-Most expensive line");
+        expensiveGo.transform.SetParent(labelObject.transform, false);
+        mostExpensiveLineText = expensiveGo.AddComponent<TextMeshProUGUI>();
+        ConfigureHudLine(mostExpensiveLineText, HudPrimaryFontSize, hudFont);
+
+        var statsGo = new GameObject("VL-Stats line");
         
         statsGo.transform.SetParent(labelObject.transform, false);
         statsLineText = statsGo.AddComponent<TextMeshProUGUI>();
