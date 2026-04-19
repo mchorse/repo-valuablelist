@@ -53,7 +53,7 @@ public class ValuableList : BaseUnityPlugin
             "General",
             "ShowDistanceInMenu",
             false,
-            "When enabled, the valuables menu appends distance from your player in meters to each line (HUD unchanged)."
+            "When enabled, the valuables menu and HUD most-expensive line show distance from your player in meters."
         );
 
         Patch();

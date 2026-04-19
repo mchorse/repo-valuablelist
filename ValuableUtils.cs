@@ -12,7 +12,7 @@ internal static class ValuableUtils
 {
     private static readonly Regex RoomMetadataPrefixRegex = new(@"^[^-]+?\s*-\s*[A-Z]+\s*-\s*\d+\s*-\s*(.+)$", RegexOptions.Compiled);
     private static float hudCacheTime;
-    private static (ValuableEntry? Entry, int Count) mostExpensiveCachedResult;
+    private static (ValuableEntry? Entry, int Count, float DistanceToBestMeters) mostExpensiveCachedResult;
     private static (int CollectedCount, int TotalCount, int CollectedValue, int TotalValue) levelCollectionCachedResult;
     private const float HudCacheInterval = 0.5f;
 
@@ -76,7 +76,7 @@ internal static class ValuableUtils
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
-    internal static (ValuableEntry? Entry, int Count) GetMostExpensiveInCurrentRoom()
+    internal static (ValuableEntry? Entry, int Count, float DistanceToBestMeters) GetMostExpensiveInCurrentRoom()
     {
         EnsureHudCaches();
         
@@ -106,6 +106,7 @@ internal static class ValuableUtils
     {
         var currentRoom = GetCurrentPlayerRoomName();
         ValuableEntry? best = null;
+        var distanceToBest = 0f;
         var roomCount = 0;
         var totalCount = 0;
         var collectedCount = 0;
@@ -139,12 +140,13 @@ internal static class ValuableUtils
                     if (best == null || price > best.Value.Price)
                     {
                         best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false, 0f);
+                        distanceToBest = GetDistanceFromPlayerMeters(v);
                     }
                 }
             }
         }
 
-        mostExpensiveCachedResult = (best, roomCount);
+        mostExpensiveCachedResult = (best, roomCount, distanceToBest);
         levelCollectionCachedResult = (collectedCount, totalCount, collectedValue, totalValue);
     }
 

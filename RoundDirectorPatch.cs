@@ -46,7 +46,7 @@ internal static class RoundDirectorPatch
         currentRoomLineText.text = string.IsNullOrWhiteSpace(formattedRoom) ? "Unknown" : formattedRoom;
         currentRoomLineText.color = HudCurrentRoomColor;
 
-        var (entry, count) = ValuableUtils.GetMostExpensiveInCurrentRoom();
+        var (entry, count, distanceToBest) = ValuableUtils.GetMostExpensiveInCurrentRoom();
         var (collected, total, collectedValue, totalValue) = ValuableUtils.GetLevelCollectionStats();
         var statsPlain = $"{collected}/{total} - {ValuableUtils.FormatPrice(collectedValue)}/{ValuableUtils.FormatPrice(totalValue)}";
 
@@ -58,7 +58,17 @@ internal static class RoundDirectorPatch
             if (entry != null)
             {
                 mostExpensiveLineText.gameObject.SetActive(true);
-                mostExpensiveLineText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)} ({count})";
+
+                if (ValuableList.Instance.ShowDistanceInMenuEnabled)
+                {
+                    var dist = ValuableUtils.FormatDistanceMetersOneDecimal(distanceToBest);
+                    
+                    mostExpensiveLineText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)}/{dist}m ({count})";
+                }
+                else
+                {
+                    mostExpensiveLineText.text = $"{entry.Value.Name} - {ValuableUtils.FormatPrice(entry.Value.Price)} ({count})";
+                }
             }
             else
             {
