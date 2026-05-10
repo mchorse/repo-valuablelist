@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Logging;
+using HarmonyLib;
 using MenuLib;
 using MenuLib.MonoBehaviors;
 using TMPro;
@@ -72,7 +73,7 @@ internal sealed class ValuablesMenu
             currentPage = page;
             isOpen = true;
             page.OpenPage(false);
-            ValuableList.Instance.StartCoroutine(ScrollToCurrentPlayerRoomAfterOpen(page, grouped));
+            ValuableList.Instance.StartCoroutine(ScrollToCurrentPlayerRoomAfterOpen(page));
         }
         catch (Exception ex)
         {
@@ -185,7 +186,7 @@ internal sealed class ValuablesMenu
 
             if (groupHeader != null)
             {
-                roomGroupVisuals.Add(new RoomGroupVisual(roomGroup.Key, groupHeader, entryVisuals, spacer));
+                roomGroupVisuals.Add(new RoomGroupVisual(roomGroup.Key, groupHeader, entryVisuals, spacer, 0f));
             }
         }
     }
@@ -274,43 +275,47 @@ internal sealed class ValuablesMenu
         }
     }
 
-    private static void ScrollToCurrentPlayerRoom(REPOPopupPage page, List<IGrouping<string, ValuableEntry>> grouped)
+    private void ScrollToCurrentPlayerRoom(REPOPopupPage page)
     {
-        if (grouped.Count == 0)
+        var msb = page.menuScrollBox;
+
+        page.scrollView.UpdateElements();
+        TryRecalculateMenuScrollHeight(msb);
+        page.scrollView.UpdateElements();
+        CacheRoomScrollTargets(page);
+
+        if (msb == null || !msb.scrollBar.activeSelf || roomGroupVisuals.Count == 0)
         {
+            SnapMenuScrollToScrollerY(msb, 0f);
+
             return;
         }
 
         var currentRoom = ValuableUtils.GetCurrentPlayerRoomName();
-        
+
         if (string.IsNullOrWhiteSpace(currentRoom))
         {
-            page.scrollView.SetScrollPosition(0f);
+            SnapMenuScrollToScrollerY(msb, 0f);
+
             return;
         }
 
-        var roomIndex = grouped.FindIndex(group => string.Equals(group.Key, currentRoom, StringComparison.OrdinalIgnoreCase));
-        
+        var roomIndex = roomGroupVisuals.FindIndex(group =>
+            string.Equals(group.RoomName, currentRoom, StringComparison.OrdinalIgnoreCase));
+
         if (roomIndex < 0)
         {
-            page.scrollView.SetScrollPosition(0f);
+            SnapMenuScrollToScrollerY(msb, 0f);
+
             return;
         }
 
-        if (roomIndex == 0)
-        {
-            page.scrollView.SetScrollPosition(0f);
-            return;
-        }
-
-        var normalizedPosition = (float)roomIndex / Math.Max(1, grouped.Count - 1);
-        
-        page.scrollView.SetScrollPosition(normalizedPosition);
+        SnapMenuScrollToScrollerY(msb, roomGroupVisuals[roomIndex].CachedTargetScrollerY);
+        page.scrollView.UpdateElements();
     }
 
-    private IEnumerator ScrollToCurrentPlayerRoomAfterOpen(REPOPopupPage page, List<IGrouping<string, ValuableEntry>> grouped)
+    private IEnumerator ScrollToCurrentPlayerRoomAfterOpen(REPOPopupPage page)
     {
-        // Wait for popup open/layout to complete before setting scroll.
         yield return null;
         yield return null;
 
@@ -319,9 +324,137 @@ internal sealed class ValuablesMenu
             yield break;
         }
 
-        // Ensure search-state visibility is initialized after scroll elements are fully wired.
         ApplySearchFilter(page, string.Empty);
-        ScrollToCurrentPlayerRoom(page, grouped);
+        ScrollToCurrentPlayerRoom(page);
+    }
+
+    /// <summary>
+    /// Fills <see cref="RoomGroupVisual.CachedTargetScrollerY"/> — scroller local Y that aligns each room header with the mask top.
+    /// </summary>
+    private void CacheRoomScrollTargets(REPOPopupPage page)
+    {
+        var msb = page.menuScrollBox;
+
+        if (roomGroupVisuals.Count == 0 || msb == null)
+        {
+            return;
+        }
+
+        if (!msb.scrollBar.activeSelf)
+        {
+            foreach (var g in roomGroupVisuals)
+            {
+                g.CachedTargetScrollerY = 0f;
+            }
+
+            return;
+        }
+
+        foreach (var g in roomGroupVisuals)
+        {
+            g.Header.gameObject.SetActive(true);
+        }
+
+        var maskRt = page.maskRectTransform;
+        var maskTop = GetWorldTopY(maskRt);
+
+        SetScrollerLocalYRaw(msb, 0f);
+        var headerTopsAt0 = new float[roomGroupVisuals.Count];
+
+        for (var i = 0; i < roomGroupVisuals.Count; i++)
+        {
+            headerTopsAt0[i] = GetWorldTopY(roomGroupVisuals[i].Header.rectTransform);
+        }
+
+        var start = (float)MenuScrollReflection.ScrollerStartPosition.GetValue(msb)!;
+        var probeY = Mathf.Abs(start) > 1f ? start * 0.5f : 100f;
+
+        SetScrollerLocalYRaw(msb, probeY);
+        var firstHeaderTopAtProbe = GetWorldTopY(roomGroupVisuals[0].Header.rectTransform);
+
+        var worldDelta = firstHeaderTopAtProbe - headerTopsAt0[0];
+        var perUnit = Mathf.Abs(probeY) < 0.0001f ? 0f : worldDelta / probeY;
+
+        for (var i = 0; i < roomGroupVisuals.Count; i++)
+        {
+            if (Mathf.Abs(perUnit) < 0.0001f)
+            {
+                roomGroupVisuals[i].CachedTargetScrollerY = 0f;
+                continue;
+            }
+
+            roomGroupVisuals[i].CachedTargetScrollerY = (maskTop - headerTopsAt0[i]) / perUnit;
+        }
+
+        SnapMenuScrollToScrollerY(msb, 0f);
+    }
+
+    private static void TryRecalculateMenuScrollHeight(MenuScrollBox? menuScrollBox)
+    {
+        if (menuScrollBox == null)
+        {
+            return;
+        }
+
+        AccessTools.Method(typeof(MenuScrollBox), "RecalculateScrollHeight")?.Invoke(menuScrollBox, null);
+    }
+
+    private static float GetWorldTopY(RectTransform rectTransform)
+    {
+        var corners = new Vector3[4];
+        rectTransform.GetWorldCorners(corners);
+
+        return Mathf.Max(Mathf.Max(corners[0].y, corners[1].y), Mathf.Max(corners[2].y, corners[3].y));
+    }
+
+    /// <summary>
+    /// Instant scroll: set <c>MenuScrollBox.scroller</c> local Y, then sync handle / <c>scrollAmount</c> (MenuLib patched formula).
+    /// </summary>
+    internal static void SnapMenuScrollToScrollerY(MenuScrollBox? menuScrollBox, float scrollerLocalY)
+    {
+        SetScrollerLocalYRaw(menuScrollBox, scrollerLocalY);
+        SyncScrollBox(menuScrollBox);
+    }
+
+    private static void SetScrollerLocalYRaw(MenuScrollBox? msb, float y)
+    {
+        if (msb?.scroller == null)
+        {
+            return;
+        }
+
+        var sc = msb.scroller;
+        sc.localPosition = new Vector3(sc.localPosition.x, y, sc.localPosition.z);
+    }
+
+    private static void SyncScrollBox(MenuScrollBox? msb)
+    {
+        if (msb == null || !msb.scrollBar.activeSelf)
+        {
+            return;
+        }
+
+        var start = (float)MenuScrollReflection.ScrollerStartPosition.GetValue(msb)!;
+        var end = (float)MenuScrollReflection.ScrollerEndPosition.GetValue(msb)!;
+        var range = end - start;
+        var y = msb.scroller.localPosition.y;
+        var scrollAmount = Mathf.Approximately(range, 0f) ? 1f : Mathf.Clamp01((y - start) / range);
+
+        var bgH = msb.scrollBarBackground.rect.height;
+        var half = msb.scrollHandle.sizeDelta.y / 2f;
+        var handleY = scrollAmount * bgH - half;
+        handleY = Mathf.Clamp(handleY, half, bgH - half);
+        var finalScrollAmount = Mathf.Clamp01((handleY + half) / bgH);
+
+        msb.scrollHandle.localPosition =
+            new Vector3(msb.scrollHandle.localPosition.x, handleY, msb.scrollHandle.localPosition.z);
+
+        MenuScrollReflection.ScrollHandleTargetPosition.SetValue(msb, handleY);
+        MenuScrollReflection.ScrollAmount.SetValue(msb, finalScrollAmount);
+
+        var finalY = Mathf.Lerp(start, end, finalScrollAmount);
+        var sc = msb.scroller;
+        sc.localPosition = new Vector3(sc.localPosition.x, finalY, sc.localPosition.z);
     }
 
     private REPOLabel? AddCollectedSummaryLabel(REPOPopupPage page, List<IGrouping<string, ValuableEntry>> grouped)
@@ -477,19 +610,21 @@ internal sealed class ValuablesMenu
         internal int Price { get; }
     }
 
-    private readonly struct RoomGroupVisual
+    private sealed class RoomGroupVisual
     {
-        internal RoomGroupVisual(string roomName, REPOLabel header, List<ValuableRowVisual> rows, REPOSpacer? spacer)
+        internal RoomGroupVisual(string roomName, REPOLabel header, List<ValuableRowVisual> rows, REPOSpacer? spacer, float cachedTargetScrollerY)
         {
             RoomName = roomName;
             Header = header;
             Rows = rows;
             Spacer = spacer;
+            CachedTargetScrollerY = cachedTargetScrollerY;
         }
 
         internal string RoomName { get; }
         internal REPOLabel Header { get; }
         internal List<ValuableRowVisual> Rows { get; }
         internal REPOSpacer? Spacer { get; }
+        internal float CachedTargetScrollerY { get; set; }
     }
 }
