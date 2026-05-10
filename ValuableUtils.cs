@@ -14,7 +14,14 @@ internal static class ValuableUtils
     private static float hudCacheTime;
     private static (ValuableEntry? Entry, int Count, float DistanceToBestMeters) mostExpensiveCachedResult;
     private static (int CollectedCount, int TotalCount, int CollectedValue, int TotalValue) levelCollectionCachedResult;
+    private static (int InRoomCount, int TotalCount, SemiFunc.Rarity? RoomDominantRarity) cosmeticBoxesCachedResult;
     private const float HudCacheInterval = 0.5f;
+
+    private static bool cosmeticBoxColorsResolved;
+    private static Color cosmeticBoxColorCommon = new Color(0.31f, 0.85f, 0.31f, 1f);
+    private static Color cosmeticBoxColorUncommon = new Color(0.4f, 0.7f, 1f, 1f);
+    private static Color cosmeticBoxColorRare = new Color(1f, 0.08f, 0.58f, 1f);
+    private static Color cosmeticBoxColorUltraRare = new Color(1f, 0.65f, 0.1f, 1f);
 
     internal static List<IGrouping<string, ValuableEntry>> GetGroupedValuables()
     {
@@ -90,6 +97,62 @@ internal static class ValuableUtils
         return levelCollectionCachedResult;
     }
 
+    internal static (int InRoomCount, int TotalCount, SemiFunc.Rarity? RoomDominantRarity) GetCosmeticBoxStats()
+    {
+        EnsureHudCaches();
+
+        return cosmeticBoxesCachedResult;
+    }
+
+    internal static Color GetCosmeticBoxRarityColor(SemiFunc.Rarity rarity)
+    {
+        if (!cosmeticBoxColorsResolved)
+        {
+            TryResolveCosmeticBoxColors();
+        }
+
+        return rarity switch
+        {
+            SemiFunc.Rarity.Common => cosmeticBoxColorCommon,
+            SemiFunc.Rarity.Uncommon => cosmeticBoxColorUncommon,
+            SemiFunc.Rarity.Rare => cosmeticBoxColorRare,
+            SemiFunc.Rarity.UltraRare => cosmeticBoxColorUltraRare,
+            _ => Color.white,
+        };
+    }
+
+    internal static string ToHtmlHex(Color color)
+    {
+        var r = Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f);
+        var g = Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255f);
+        var b = Mathf.RoundToInt(Mathf.Clamp01(color.b) * 255f);
+
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+
+    private static void TryResolveCosmeticBoxColors()
+    {
+        var ui = CosmeticWorldObjectUI.instance;
+
+        if (ui == null || ui.elementPrefab == null)
+        {
+            return;
+        }
+
+        var element = ui.elementPrefab.GetComponent<CosmeticWorldObjectUIElement>();
+
+        if (element == null)
+        {
+            return;
+        }
+
+        cosmeticBoxColorCommon = element.colorCommon;
+        cosmeticBoxColorUncommon = element.colorUncommon;
+        cosmeticBoxColorRare = element.colorRare;
+        cosmeticBoxColorUltraRare = element.colorUltraRare;
+        cosmeticBoxColorsResolved = true;
+    }
+
     private static void EnsureHudCaches()
     {
         if (Time.time - hudCacheTime < HudCacheInterval)
@@ -148,6 +211,63 @@ internal static class ValuableUtils
 
         mostExpensiveCachedResult = (best, roomCount, distanceToBest);
         levelCollectionCachedResult = (collectedCount, totalCount, collectedValue, totalValue);
+
+        ComputeCosmeticBoxCaches(currentRoom);
+    }
+
+    private static void ComputeCosmeticBoxCaches(string? currentRoom)
+    {
+        var inRoom = 0;
+        var total = 0;
+        SemiFunc.Rarity? roomDominantRarity = null;
+
+        var roundDirector = RoundDirector.instance;
+
+        if (roundDirector != null)
+        {
+            foreach (var cosmetic in roundDirector.cosmeticWorldObjects)
+            {
+                if (!cosmetic)
+                {
+                    continue;
+                }
+
+                total++;
+
+                if (string.IsNullOrWhiteSpace(currentRoom))
+                {
+                    continue;
+                }
+
+                var room = GetCosmeticRoomName(cosmetic);
+
+                if (!string.Equals(room, currentRoom, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                inRoom++;
+
+                if (roomDominantRarity == null || cosmetic.rarity > roomDominantRarity.Value)
+                {
+                    roomDominantRarity = cosmetic.rarity;
+                }
+            }
+        }
+
+        cosmeticBoxesCachedResult = (inRoom, total, roomDominantRarity);
+    }
+
+    private static string GetCosmeticRoomName(CosmeticWorldObject cosmetic)
+    {
+        var room = cosmetic.roomVolumeCheck?.CurrentRooms?.FirstOrDefault(r => r != null && r.Module != null);
+
+        if (room?.Module == null)
+        {
+            return "Unknown";
+        }
+
+        return CleanRoomName(room.Module.name);
     }
 
     internal static string? GetCurrentPlayerRoomName()

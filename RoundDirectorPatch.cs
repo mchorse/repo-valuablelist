@@ -48,9 +48,10 @@ internal static class RoundDirectorPatch
 
         var (entry, count, distanceToBest) = ValuableUtils.GetMostExpensiveInCurrentRoom();
         var (collected, total, collectedValue, totalValue) = ValuableUtils.GetLevelCollectionStats();
-        var statsPlain = $"{collected}/{total} - {ValuableUtils.FormatPrice(collectedValue)}/{ValuableUtils.FormatPrice(totalValue)}";
+        var (boxesInRoom, boxesTotal, boxesRoomRarity) = ValuableUtils.GetCosmeticBoxStats();
+        var baseStats = $"{collected}/{total} - {ValuableUtils.FormatPrice(collectedValue)}/{ValuableUtils.FormatPrice(totalValue)}";
 
-        statsLineText.text = statsPlain;
+        statsLineText.text = boxesTotal > 0 ? $"{baseStats} - {FormatCosmeticBoxesRichText(boxesInRoom, boxesTotal, boxesRoomRarity)}" : baseStats;
         statsLineText.color = total > 0 && collected == total ? ValuablesMenu.HighlightValueLabelColor : Color.white;
 
         if (mostExpensiveLineText != null)
@@ -146,6 +147,7 @@ internal static class RoundDirectorPatch
         statsGo.transform.SetParent(labelObject.transform, false);
         statsLineText = statsGo.AddComponent<TextMeshProUGUI>();
         ConfigureHudLine(statsLineText, HudStatsFontSize, hudFont);
+        statsLineText.richText = true;
 
         var rect = labelObject.GetComponent<RectTransform>();
 
@@ -176,6 +178,20 @@ internal static class RoundDirectorPatch
         lineFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         lineFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
     }
+
+#pragma warning disable Harmony003 // FormatCosmeticBoxesRichText is a helper, not a Harmony patch; analyzer misreads Nullable<T> member access.
+    private static string FormatCosmeticBoxesRichText(int inRoom, int total, SemiFunc.Rarity? roomRarity)
+    {
+        if (!roomRarity.HasValue)
+        {
+            return $"{inRoom}/{total}";
+        }
+
+        var hex = ValuableUtils.ToHtmlHex(ValuableUtils.GetCosmeticBoxRarityColor(roomRarity.Value));
+
+        return $"<color={hex}>{inRoom}</color>/{total}";
+    }
+#pragma warning restore Harmony003
 
     private static void SetLabelActive(bool active)
     {
