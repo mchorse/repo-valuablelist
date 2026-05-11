@@ -27,7 +27,9 @@ internal static class ValuableUtils
     {
         var orderedEntries = GetValuableEntries()
             .OrderBy(v => v.Room, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(v => v.IsCosmeticBox ? 0 : 1)
             .ThenBy(v => v.IsInCartOrExtraction)
+            .ThenByDescending(v => v.CosmeticBoxRarity.HasValue ? (int)v.CosmeticBoxRarity.Value : -1)
             .ThenByDescending(v => v.Price)
             .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -203,7 +205,7 @@ internal static class ValuableUtils
                     if (best == null || price > best.Value.Price)
                     {
                         best = new ValuableEntry(CleanValuableName(v.gameObject.name), price, room, false, 0f);
-                        distanceToBest = GetDistanceFromPlayerMeters(v);
+                        distanceToBest = GetDistanceFromPlayerMeters(v.transform);
                     }
                 }
             }
@@ -385,26 +387,88 @@ internal static class ValuableUtils
     {
         var includeDistance = ValuableList.Instance.ShowDistanceInMenuEnabled;
 
-        return GetAllValuableObjects()
+        var valuableEntries = GetAllValuableObjects()
             .Select(v => new ValuableEntry(
                 CleanValuableName(v.gameObject.name),
                 FloorDollarValue(v.dollarValueCurrent),
                 GetRoomName(v),
                 IsInCartOrExtraction(v),
-                includeDistance ? GetDistanceFromPlayerMeters(v) : 0f
+                includeDistance ? GetDistanceFromPlayerMeters(v.transform) : 0f
             ));
+
+        var cosmeticEntries = GetAllCosmeticBoxes()
+            .Select(c => new ValuableEntry(
+                GetCosmeticBoxDisplayName(c),
+                0,
+                GetCosmeticRoomName(c),
+                IsInCartOrExtraction(c),
+                includeDistance ? GetDistanceFromPlayerMeters(c.transform) : 0f,
+                c.rarity
+            ));
+
+        return valuableEntries.Concat(cosmeticEntries);
     }
 
-    private static float GetDistanceFromPlayerMeters(ValuableObject valuable)
+    private static IEnumerable<CosmeticWorldObject> GetAllCosmeticBoxes()
+    {
+        var roundDirector = RoundDirector.instance;
+
+        if (roundDirector == null)
+        {
+            return Enumerable.Empty<CosmeticWorldObject>();
+        }
+
+        return roundDirector.cosmeticWorldObjects.Where(c => c && c.gameObject.activeInHierarchy);
+    }
+
+    private static bool IsInCartOrExtraction(CosmeticWorldObject cosmetic)
+    {
+        var inCart = cosmetic.physGrabObject != null
+            && cosmetic.physGrabObject.impactDetector != null
+            && cosmetic.physGrabObject.impactDetector.inCart;
+
+        var inExtraction = cosmetic.roomVolumeCheck != null
+            && cosmetic.roomVolumeCheck.inExtractionPoint;
+
+        return inCart || inExtraction;
+    }
+
+    private static string GetCosmeticBoxDisplayName(CosmeticWorldObject cosmetic)
+    {
+        var cleaned = CleanBasicName(cosmetic.gameObject.name);
+
+        if (string.IsNullOrWhiteSpace(cleaned)
+            || string.Equals(cleaned, "Unknown", StringComparison.OrdinalIgnoreCase)
+            || cleaned.IndexOf("Cosmetic", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return GetFallbackCosmeticBoxName(cosmetic.rarity);
+        }
+
+        return cleaned;
+    }
+
+    private static string GetFallbackCosmeticBoxName(SemiFunc.Rarity rarity)
+    {
+        return rarity switch
+        {
+            SemiFunc.Rarity.Common => "Cosmetic box - Common",
+            SemiFunc.Rarity.Uncommon => "Cosmetic box - Uncommon",
+            SemiFunc.Rarity.Rare => "Cosmetic box - Rare",
+            SemiFunc.Rarity.UltraRare => "Cosmetic box - Ultra-rare",
+            _ => "Cosmetic box",
+        };
+    }
+
+    private static float GetDistanceFromPlayerMeters(Transform target)
     {
         var player = PlayerAvatar.instance;
 
-        if (player == null)
+        if (player == null || target == null)
         {
             return 0f;
         }
 
-        return Vector3.Distance(player.transform.position, valuable.transform.position);
+        return Vector3.Distance(player.transform.position, target.position);
     }
     
     public static string FormatPrice(int rawPrice)
@@ -449,13 +513,16 @@ internal readonly struct ValuableEntry
     public string Room { get; }
     public bool IsInCartOrExtraction { get; }
     public float DistanceFromPlayerMeters { get; }
+    public SemiFunc.Rarity? CosmeticBoxRarity { get; }
+    public bool IsCosmeticBox => CosmeticBoxRarity.HasValue;
 
-    internal ValuableEntry(string name, int price, string room, bool isInCartOrExtraction, float distanceFromPlayerMeters = 0f)
+    internal ValuableEntry(string name, int price, string room, bool isInCartOrExtraction, float distanceFromPlayerMeters = 0f, SemiFunc.Rarity? cosmeticBoxRarity = null)
     {
         Name = name;
         Price = price;
         Room = room;
         IsInCartOrExtraction = isInCartOrExtraction;
         DistanceFromPlayerMeters = distanceFromPlayerMeters;
+        CosmeticBoxRarity = cosmeticBoxRarity;
     }
 }

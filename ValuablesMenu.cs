@@ -157,7 +157,7 @@ internal sealed class ValuablesMenu
                     
                     lineLabel.labelTMP.fontStyle = FontStyles.Normal;
                     lineLabel.labelTMP.fontSize = 16f;
-                    lineLabel.labelTMP.color = entry.IsInCartOrExtraction ? HighlightValueLabelColor : ValueLabelColor;
+                    lineLabel.labelTMP.color = ResolveRowColor(entry);
                     
                     var size = lineLabel.rectTransform.sizeDelta;
                     
@@ -193,16 +193,27 @@ internal sealed class ValuablesMenu
 
     private static string FormatValuableLine(ValuableEntry entry)
     {
-        var priceText = ValuableUtils.FormatPrice(entry.Price);
+        var showDistance = ValuableList.Instance.ShowDistanceInMenuEnabled;
+        var distancePart = showDistance
+            ? $" ({ValuableUtils.FormatDistanceMetersOneDecimal(entry.DistanceFromPlayerMeters)}m)"
+            : string.Empty;
 
-        if (!ValuableList.Instance.ShowDistanceInMenuEnabled)
+        if (entry.IsCosmeticBox)
         {
-            return $"{entry.Name} - {priceText}";
+            return $"{entry.Name}{distancePart}";
         }
 
-        var dist = ValuableUtils.FormatDistanceMetersOneDecimal(entry.DistanceFromPlayerMeters);
+        return $"{entry.Name} - {ValuableUtils.FormatPrice(entry.Price)}{distancePart}";
+    }
 
-        return $"{entry.Name} - {priceText} ({dist}m)";
+    private static Color ResolveRowColor(ValuableEntry entry)
+    {
+        if (entry.IsCosmeticBox && entry.CosmeticBoxRarity.HasValue)
+        {
+            return ValuableUtils.GetCosmeticBoxRarityColor(entry.CosmeticBoxRarity.Value);
+        }
+
+        return entry.IsInCartOrExtraction ? HighlightValueLabelColor : ValueLabelColor;
     }
 
     private void AddSearchBox(REPOPopupPage page)
