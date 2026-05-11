@@ -1,10 +1,10 @@
 {
     "name": "ValuableList",
-    "version_number": "1.3.0",
+    "version_number": "1.4.0",
     "website_url": "https://github.com/mchorse/repo-valuablelist",
     "description": "REPO mod that adds a menu with a list of valuables on the level",
     "dependencies": [
         "BepInEx-BepInExPack-5.4.2305",
-        "nickklmao-MenuLib-2.5.1"
+        "nickklmao-MenuLib-2.5.3"
     ]
 }

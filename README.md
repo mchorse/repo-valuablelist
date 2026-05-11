@@ -8,6 +8,7 @@ It requires [MenuLib](https://thunderstore.io/c/repo/p/nickklmao/MenuLib/) mod t
 
 ## Change log
 
+* 1.4: Added cosmetic box to HUD label and valuable list menu, and minor fixes in 0.4.1
 * 1.3: Added room name HUD label, sorting rooms by prices in the menu, distance to valuables option; changed price numbers to flooring and truncated long roon names.
 * 1.2: HUD label additions (second row to display total items collected / on level, total sum collected / on level).
 * 1.1: Options (rounding valueable prices, HUD label to show most expensive item and items in the room), and menu features (room total prices, button to toggle visibility of collected valuables).
@@ -23,6 +24,7 @@ It requires [MenuLib](https://thunderstore.io/c/repo/p/nickklmao/MenuLib/) mod t
 
 ## История изменений
 
+* 1.4: Косметические контейнеры отображаются в списке ценностей и HUD, а также небольшие фиксы для 0.4.1
 * 1.3: Подпись на HUD с названием комнаты, сортировка комнат по ценам в меню, опция расстояния до ценностей; цены приводятся к целым вниз (floor), длинные названия комнат обрезаются.
 * 1.2: Дополнения HUD-подписи (вторая строка: собрано предметов / на уровне, общая сумма собранного / на уровне).
 * 1.1: Опции (округление цен ценностей, HUD-подпись с самым дорогим предметом и предметами в комнате) и возможности меню (суммы по комнатам, кнопка показа/скрытия уже собранных ценностей).

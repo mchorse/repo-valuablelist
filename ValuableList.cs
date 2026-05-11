@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ValuableList;
 
-[BepInPlugin("McHorse.ValuableList", "ValuableList", "1.3")]
+[BepInPlugin("McHorse.ValuableList", "ValuableList", "1.4")]
 [BepInDependency("nickklmao.menulib", BepInDependency.DependencyFlags.HardDependency)]
 public class ValuableList : BaseUnityPlugin
 {
